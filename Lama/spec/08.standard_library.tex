@@ -1,0 +1,545 @@
+% !TEX TS-program = pdflatex
+% !TeX spellcheck = en_US
+% !TEX root = lama-spec.tex
+\chapter{Standard Library}
+\label{sec:stdlib}
+
+The standard library is comprised of the runtime for the language and a set of pre-shipped units written in \lama itself.
+
+\section{Unit \texttt{Std}}
+\label{sec:std}
+
+The unit "\lstinline|Std|" provides the interface for the runtime of the language. The implementation of
+entities, defined in "\lstinline|Std|", resides in the runtime itself. The import of "\lstinline|Std|"
+is added implicitly by the compiler and can not be specified by an end user.
+
+The following declarations are accessible:
+
+\descr{\lstinline|fun uppercase (n)|}{Convert \lstinline|n|, treated as ASCII code, into the code of the same symbol in upper case.}
+
+\descr{\lstinline|fun lowercase (n)|}{Convert \lstinline|n|, treated as ASCII code, into the code of the same symbol in lower case.}
+
+\descr{\lstinline|fun assert (n, s, ...)|}{Asserts that \lstinline|n| is non-zero; otherwise raises \lstinline|failure| with
+  a corresponding error message.}
+
+\descr{\lstinline|fun string (x)|}{Converts \lstinline|x| into its string representation.}
+
+\descr{\lstinline|fun length (x)|}{Returns the number of immediate subvalues for a reference value \lstinline|x|; in particular, for
+  strings and arrays returns their lengths.}
+
+\descr{\lstinline|fun stringInt (s)|}{Converts a string representation of a signed decimal number into integer.}
+
+\descr{\lstinline|fun read ()|}{Reads an integer value from the standard input, printing a prompt "\lstinline|>|".}
+
+\descr{\lstinline|fun write (int)|}{Writes an integer value to the standard output.}
+
+\descr{\lstinline|sysargs|}{A variable which holds an array of command-line arguments of the application (including the
+name of the executable itself).}
+
+\descr{\lstinline|fun makeArray (size)|}{Creates a fresh array of a given length. The elements of the array are left uninitialized.}
+
+\descr{\lstinline|fun makeString (size)|}{Creates a fresh string of a given length. The elements of the string are left uninitialized.}
+
+\descr{\lstinline|fun stringcat (list)|}{Takes a list of strings and returns the concatenates all its elements.}
+
+\descr{\lstinline|fun matchSubString (subj, patt, pos)|}{Takes two strings "\lstinline|subj|" and "\lstinline|patt|" and integer position "\lstinline|pos|" and
+checks if a substring of "\lstinline|subj|" starting at position "\lstinline|pos|" is equal to "\lstinline|patt|"; returns integer value, treated as a boolean.}
+
+\descr{\lstinline|fun sprintf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}) and a variable number of arguments and
+returns a string, acquired via processing these arguments according to the format string. Note: indexed arguments are not supported.}
+
+\descr{\lstinline|fun substring (str, pos, len)|}{Takes a string, an integer position and length, and returns a substring of requested length of
+  given string starting from given position. Raises an error if the original string is shorter then \lstinline|pos+len-1|.}
+
+\descr{\lstinline|infix ++ at + (str1, str2)|}{String concatenation infix operator.}
+
+\descr{\lstinline|fun clone (value)|}{Performs a shallow cloning of the argument value.}
+
+\descr{\lstinline|fun hash (value)|}{Returns integer hash for the argument value; also works for cyclic data structures.}
+
+\descr{\lstinline|fun tagHash (s)|}{Returns an integer value for a hash of tag, represented by string \lstinline|s|.}
+
+\descr{\lstinline|fun compare (value1, value2)|}{Performs a structural deep comparison of two values. Determines a
+  linear order relation for every pairs of values. Returns \lstinline|0| if the values are structurally equal, negative or
+  positive integers otherwise. May not work for cyclic data structures.}
+
+\descr{\lstinline|fun flatCompare (x, y)|}{Performs a shallow comparison of two values. The result is similar to that for \lstinline|compare|.}
+
+\descr{\lstinline|fun fst (value)|}{Returns the first subvalue for a given boxed value.}
+
+\descr{\lstinline|fun snd (value)|}{Returns the second subvalue for a given boxed value.}
+
+\descr{\lstinline|fun hd (value)|}{Returns the head of a given list.}
+
+\descr{\lstinline|fun tl (value)|}{Return the tail of a given list.}
+
+\descr{\lstinline|fun readLine ()|}{Reads a line from the standard input and returns it as a string. Return "\lstinline|0|" if end
+of standard input was encountered.}
+
+\descr{\lstinline|fun printf (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib} and a variable number of arguments and
+prints these arguments on the standard output, according to the format string.}
+
+\descr{\lstinline|fun fopen (fname, mode)|}{Opens a file of given name in a given mode. Both arguments are strings, the return value is
+an external pointer to file structure.}
+
+\descr{\lstinline|fun fclose (file)|}{Closes a file. The file argument should be that acquired by "\lstinline|fopen|" function.}
+
+\descr{\lstinline|fun fread (fname)|}{Reads a file content and returns it as a string. The argument is a file name as a string, the file
+is automatically open and closed within the call.}
+
+\descr{\lstinline|fun fwrite (fname, contents)|}{Writes a file. The arguments are file name and the contents to write as strings. The file
+is automatically created and closed within the call.}
+
+\descr{\lstinline|fun fexists (fname)|}{Checks if a file exists. The argument is the file name.}
+
+\descr{\lstinline|fun fprintf (file, fmt, ...)|}{Same as "\lstinline|printf|", but outputs to a given file. The file argument should be that acquired
+  by \lstinline|fopen| function.}
+
+\descr{\lstinline|fun regexp (string)|}{Compiles a string representation of a regular expression (as per POSIX-Extended Regular Expressions syntax) into
+  an internal representation. The return value is an external pointer to the internal representation.}
+
+\descr{\lstinline|fun regexpMatch (pattern, subj, pos)|}{Matches a string "\lstinline{subj}", starting from the position "\lstinline|pos|",
+  against a pattern "\lstinline{pattern}". The pattern is an external pointer to a compiled representation, returned by the
+  function "\lstinline|regexp|". The return value is the number of matched characters.}
+
+\descr{\lstinline|fun failure (fmt, ...)|}{Takes a format string (as per GNU C Library~\cite{GNUCLib}, and a variable number of parameters,
+  prints these parameters according to the format string on the standard error and exits. Note: indexed arguments are not supported.)}
+
+\descr{\lstinline|fun system (cmd)|}{Executes a command in a shell. The argument is a string representing a command.}
+
+\descr{\lstinline|fun getEnv (name)|}{Returns a value for an environment variable "\lstinline|name|". The argument is a string, the
+return value is either "\lstinline|0|" (if not environment variable with given name is set), or a string value.}
+
+\descr{\lstinline|fun random (n)|}{Returns a pseudo-random number in the interval $0..n-1$. The seed is auto-initialized by current time at 
+program start time.}
+
+\descr{\lstinline|fun time ()|}{Returns the elapsed time from program start in microseconds.}
+
+\section{Unit \texttt{Data}}
+\label{sec:data}
+
+Generic data manupulation.
+
+\descr{\lstinline|infix =?= at < (x, y)|}{A generic comparison operator similar to \lstinline|compare|, but capable of handling cyclic/shared data structures.}
+\descr{\lstinline|infix === at == (x, y)|}{A generic equality operator capable of handling cyclic/shared data structures.}
+
+\section{Unit \texttt{Timer}}
+\label{sec:timer}
+
+A simple timer.
+
+\descr{\lstinline|fun timer ()|}{Creates a timer. Creates a zero-argument function which, being called, returns the elapsed time in microseconds since its creation.}
+\descr{\lstinline|fun toSeconds (n)|}{Converts an integer value, interpreted as microseconds, into a floating-point string.}
+
+\section{Unit \texttt{Random}}
+\label{sec:random}
+
+Random data structures generation functions.
+
+\descr{\lstinline|fun randomInt ()|}{Generates a random representable integer value.}
+
+\descr{\lstinline|fun randomString (len)|}{Generates a random string of printable \textsc{ASCII} characters of given length.}
+
+\descr{\lstinline|fun randomArray (f, n)|}{Generates a random array of \emph{deep} size \lstinline|n|. The length of the array is chosen randomly, and \lstinline|f| is intended to be an element-generating function which takes the size of the element as an argument.}
+
+\descr{\lstinline|fun split (n, k)|}{Splits a non-negative integer \lstinline|n| in \lstinline|k| random summands. Returns an array if length \lstinline|k|. \lstinline|k| has to be non-negative.}
+
+\newsavebox\strubox
+
+\begin{lrbox}{\strubox}
+\begin{lstlisting}
+    structure (100,
+               [[2, fun ([x, y]) {Add (x, y)}],
+                [2, fun ([x, y]) {Sub (x, y)}]],
+               fun () {Const (randomInt ())}
+              )    
+\end{lstlisting}  
+\end{lrbox}
+
+\descr{\lstinline|fun structure (n, nodeSpec, leaf)|}{Generates a random tree-shaped data structure of size \lstinline|n|. \lstinline|nodeSpec| is an array of pairs \lstinline|[$k$, $f_k$]|, where $k$ is a non-negative integer and $f_k$ is a function which takes an array of length $k$ as its argument. Each pair describes a generator of a certain kind of interior node with degree $k$. \lstinline|leaf| is a zero-argument function which generates the leaves of the tree. For example, the following code
+
+\usebox\strubox
+
+can be used to generate a random arithmetic expression of size 100.}
+
+\section{Unit \texttt{Array}}
+\label{sec:array}
+
+Array processing functions:
+
+\descr{\lstinline|fun initArray (n, f)|}{Takes an integer value "\lstinline|n|" and a function "\lstinline|f|" and creates an array
+  \[
+     \mbox{\lstinline|[f (0), f (1), ..., f (n-1)]|}
+  \]
+}
+
+\descr{\lstinline|fun mapArray (f, a)|}{Maps a function "\lstinline|f|" over an array "\lstinline|a|" and returns a new array.}
+
+\descr{\lstinline|fun arrayList (a)|}{Converts an array to list (preserving the order of elements).}
+
+\descr{\lstinline|fun listArray (l)|}{Converts a list to array (preserving the order of elements).}
+
+\descr{\lstinline|fun foldlArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  in a left-to-right manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
+
+\descr{\lstinline|fun foldrArray (f, acc, a)|}{Folds an array "\lstinline|a|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  in a right-to-left manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and an array element.}
+
+\descr{\lstinline|fun iterArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|"; does not return a value.}
+
+\descr{\lstinline|fun iteriArray (f, a)|}{Applies a function "\lstinline|f|" to each element of an array "\lstinline|a|" and its index (index first);
+  does not return a value.}
+
+\descr{\lstinline|fun findArray (f, a)|}{Finds a value in an array "\lstinline|a|" which satisfies the predicate "\lstinline|f|". The
+  predicate must return integer value, treated as boolean. Returns "\lstinline|None|" if no element satisfies "\lstinline|f|" and
+  "\lstinline|Some (v)|" otherwise, where "\lstinline|v|"~--- the first value to satisfy "\lstinline|f|".}
+
+\section{Unit \texttt{Collection}}
+\label{sec:collection}
+
+Collections, implemented as AVL-trees. Four types of collections are provided: sets of ordered elements, maps of ordered keys to other values, memo
+tables and hash tables. For sets and maps the generic "\lstinline|compare|" function from the unit "\lstinline|Std|" is used
+as ordering relation. For memo table and hash tables the comparison of generic hash values, delivered by function "\lstinline|hash|" of unit "\lstinline|Std|"
+is used. 
+
+\subsection{Maps}
+
+Maps are immutable structures with the following interface:
+
+\descr{\lstinline|fun emptyMap (f)|}{Creates an empty map. An argument is a comparison function, which returns zero, positive or negative integer values depending on
+the order of its arguments.}
+
+\descr{\lstinline|fun isEmptyMap (m)|}{Returns true if an argument map is empty.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the map given as an argument.}
+
+\descr{\lstinline|fun addMap (m, k, v)|}{Adds a binding of a key "\lstinline|k|" to a value "\lstinline|v|" into a map "\lstinline|m|". As a result, a new map is
+returned.}
+
+\descr{\lstinline|fun findMap (m, k)|}{Finds a binding for a key "\lstinline|k|" in the map "\lstinline|m|". Returns the value "\lstinline|None|" if
+no binding is found, and "\lstinline|Some (v)|" if "\lstinline|k|" is bound to "\lstinline|v|".}
+
+\descr{\lstinline|fun removeMap (m, k)|}{Removes the binding for "\lstinline|k|" from the map "\lstinline|m|" and returns a new map. This function
+restores a value which was previously bound to "\lstinline|k|".}
+
+\descr{\lstinline|fun bindings (m)|}{Returns all bindings for the map "\lstinline|m|" as a list of key-value pairs, in key-ascending order.}
+
+\descr{\lstinline|fun listMap (l)|}{Converts a list of key-value pairs into a map.}
+
+\descr{\lstinline|fun iterMap (f, m)|}{Iterates a function "\lstinline|f|" over the bindings of map "\lstinline|m|". The function takes two
+  arguments (key and value). The bindings are enumerated in an ascending order.}
+
+\descr{\lstinline|fun mapMap (f, m)|}{Maps a function "\lstinline|f|" over all values of "\lstinline|m|" and returns a new map of results.}
+
+\descr{\lstinline|fun foldMap (f, acc, m)|}{Folds a map "\lstinline|m|" using a function "\lstinline|f|" and initial value "\lstinline|acc|".
+The function takes an accumulator and a pair key-value. The bindings are enumerated in an ascending order.}
+
+\subsection{Sets}
+
+Sets are immutable structures with the following interface:
+
+\descr{\lstinline|fun emptySet (compare)|}{Creates an empty set. An argument is a comparison function, which returns zero, positive or negative integer values depending on
+the order of its arguments.}
+
+\descr{\lstinline|fun isEmptySet (m)|}{Returns true if an argument set is empty.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the set given as an argument.}
+
+\descr{\lstinline|fun addSet (s, v)|}{Adds an element "\lstinline|v|" into a set "\lstinline|s|" and returns a new set.}
+
+\descr{\lstinline|fun memSet (s, v)|}{Tests if an element "\lstinline|v|" is contained in the set "\lstinline|s|". Returns zero if
+there is no such element and non-zero otherwise.}
+
+\descr{\lstinline|fun removeSet (s, v)|}{Removes an element "\lstinline|v|" from the set "\lstinline|s|" and returns a new set.}
+
+\descr{\lstinline|fun elements (s)|}{Returns a list of elements of a given set in ascending order.}
+
+\descr{\lstinline|fun union (a, b)|}{Returns a union of given sets as a new set.}
+
+\descr{\lstinline|fun diff (a, b)|}{Returns a difference between sets "\lstinline|a|" and "\lstinline|b|" (a set of those elements
+  of "\lstinline|a|" which are not in "\lstinline|b|") as a new set.}
+
+\descr{\lstinline|fun listSet (l, compare)|}{Converts a list into a set. The second argument is a comparison function as per \lstinline|emptySet|.}
+
+\descr{\lstinline|fun iterSet (f, s)|}{Applied a function "\lstinline|f|" to each element of the set "\lstinline|s|". The elements are
+enumerated in ascending order.}
+
+\descr{\lstinline|fun mapSet (f, s)|}{Applies a function "\lstinline|f|" to each element of the set "\lstinline|s|" and returns a new set of images. The
+elements are enumerated in an ascending order.}
+
+\descr{\lstinline|fun foldSet (f, acc, s)|}{Folds a set "\lstinline|s|" using the function "\lstinline|f|" and initial value "\lstinline|acc|". The function
+"\lstinline|f|" takes two arguments~--- an accumulator and an element of the set. The elements of set are enumerated in an ascending order.}
+
+\subsection{Memoization Tables}
+
+Memoization tables can be used for \emph{hash-consing}~\cite{hashConsing}~--- a data transformation which converts structurally equal
+data structures into physically equal. Memoization tables are mutable; they do not work for cyclic data structures.
+
+\descr{\lstinline|fun emptyCustomMemo (p, c)|}{Creates an empty customized memo table; \lstinline|p| is a predicate to filter out certain data structures (returns true on
+data structures which \emph{should not be} hash-consed; ``\lstinline|\{\}|'' can be specified for always false predicate); \lstinline|c| is a custom comparison function.}
+
+\descr{\lstinline|fun emptyMemo ()|}{Creates an empty memo table. Equivalent to \lstinline|emptyCustomMemo (\{\}, compare)|.}
+
+\descr{\lstinline|fun lookupMemo (m, v)|}{Lookups a value "\lstinline|v|" in a memo table "\lstinline|m|", performing hash-consing and
+  returning a hash-consed value.} 
+
+\subsection{Hash Tables}
+
+Hash table is an immutable map which uses hashes as keys and lists of key-value pairs as values. For hashing a generic
+hash function is used, the search within the same hash class is linear with physical equality "\lstinline|==|" used for
+comparison. 
+
+\descr{\lstinline|fun emptyHashTab (n, h, c)|}{Creates an empty hash table. Argument are: a number of classes, hash and comparison functions.}
+
+\descr{\lstinline|fun compareOf (m)|}{Returns a comparison function, associated with the hash table given as an argument.}
+
+\descr{\lstinline|fun hashOf (m)|}{Returns a hash function, associated with the hash table given as an argument.}
+
+\descr{\lstinline|fun addHashTab (t, k, v)|}{Adds a binding of "\lstinline|k|" to "\lstinline|v|" to the hash table "\lstinline|t|" and returns a
+new hash table.}
+
+\descr{\lstinline|fun findHashTab (t, k)|}{Searches for a binding for a key "\lstinline|k|" in the table "\lstinline|t|". Returns "\lstinline|None|"
+if no binding is found and "\lstinline|Some (v)|" otherwise, where "\lstinline|v|" is a bound value.}
+
+\descr{\lstinline|fun removeHashTab (t, k)|}{Removes a binding for the key "\lstinline|k|" from hash table "\lstinline|t|" and returns a new hash table.
+  The previous binding for "\lstinline|k|" (if any) is restored.}
+
+\section{Unit \texttt{Fun}}
+
+The unit defines some generic functional stuff:
+
+\descr{\lstinline|fun id (x)|}{The identify function.}
+
+\descr{\lstinline[mathescape=false]|infixl $ after := (f, x)|}{Left-associative infix for function application.}
+
+\descr{\lstinline|infix # after * (f, g)|}{Non-associative infix for functional composition.}
+
+\newsavebox\factbox
+
+\begin{lrbox}{\factbox}
+\begin{lstlisting}
+    fix (fun (f) { 
+           fun (n) { 
+             if n == 1 then 1 else n * f (n-1) fi
+           }
+         })     
+\end{lstlisting}
+\end{lrbox}
+
+\descr{\lstinline|fun fix (f)|}{Fixpoint combinator. The argument is a knot-accepting function, thus a factorial can be
+  defined as
+
+  \usebox\factbox
+}
+
+\section{Unit \texttt{Lazy}}
+\label{sec:std:lazy}
+
+The unit provides primitives for lazy evaluation.
+
+\descr{\lstinline|fun makeLazy (f)|}{Creates a lazy value from a function "\lstinline|f|". The function must not require any arguments.}
+
+\descr{\lstinline|fun force (f)|}{Returns a suspended value, forcing its evaluation if needed.}
+
+\section{Unit \texttt{List}}
+\label{sec:std:list}
+
+The unit provides some list-manipulation functions.
+
+\descr{\lstinline|fun size (l)|}{Returns the length of the list.}
+
+\descr{\lstinline|fun foldl (f, acc, l)|}{Folds a list "\lstinline|l|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  is the left-to-right manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and a list element.}
+
+\descr{\lstinline|fun foldr (f, acc, l)|}{Folds a list "\lstinline|l|" with a function "\lstinline|f|" and initial value "\lstinline|acc|"
+  is the right-to-left manner. The function "\lstinline|f|" takes two arguments~--- an accumulator and a list element.}
+
+\descr{\lstinline|fun iter (f, l)|}{Applies a function "\lstinline|f|" to the elements of the list "\lstinline|l|" in the
+giver order.}
+
+\descr{\lstinline|fun map (f, l)|}{Maps a function "\lstinline|f|" to the elements of the list "\lstinline|l|" and returns a
+fresh list if images in the same order.}
+
+\descr{\lstinline|infix +++ at + (x, y)|}{Returns the concatenation of lists "\lstinline|x|" and "\lstinline|y|".}
+
+\descr{\lstinline|fun reverse (l)|}{Reverses a list.}
+
+\descr{\lstinline|fun assoc (l, x)|}{Finds a value for a key "\lstinline|x|" in an associative list "\lstinline|l|". Returns
+  "\lstinline|None|" if no value is found and "\lstinline|Some (v)|" otherwise, where "\lstinline|v|"~--- the first value
+  whise key equals "\lstinline|x|". Uses generic comparison to compare keys.}
+
+\descr{\lstinline|fun find (f, l)|}{Finds a value in a list "\lstinline|l|" which satisfies the predicate "\lstinline|f|". The
+  predicate must return integer value, treated as boolean. Returns "\lstinline|None|" if no element satisfies "\lstinline|f|" and
+  "\lstinline|Some (v)|" otherwise, where "\lstinline|v|"~--- the first value to satisfy "\lstinline|f|".
+}
+
+\descr{\lstinline|fun flatten (l)|}{Flattens a list of lists into a regular list. The order of elements is preserved in both senses.}
+
+\descr{\lstinline|fun deepFlatten (l)|}{Flattens an arbitrary nesting of lists of \emph{boxed} values into a regular list. The order of elements is preserved in both senses.}
+
+\descr{\lstinline|fun zip (a, b)|}{Zips a pair of lists into the list of pairs. Does not work for lists of different lengths.}
+
+\descr{\lstinline|fun unzip (a)|}{Splits a list of pairs into pairs of lists.}
+
+\descr{\lstinline|fun remove (f, l)|}{Removes the first value, satisfying the predicate "\lstinline|f|", from the list "\lstinline|l|". The function
+"\lstinline|f|" should return integers, treated as booleans.}
+
+\descr{\lstinline|fun filter (f, l)|}{Removes all values, not satisfying the predicate "\lstinline|f|", from the list "\lstinline|l|". The function
+"\lstinline|f|" should return integers, treated as booleans.}
+
+\section{Unit \texttt{Buffer}}
+\label{sec:std:buffer}
+
+Mutable buffers.
+
+\descr{\lstinline|fun emptyBuffer ()|}{Creates an empty buffer.}
+
+\descr{\lstinline|fun singletonBuffer (x)|}{Creates a buffer from a single element.}
+
+\descr{\lstinline|fun listBuffer (x)|}{Creates a buffer from a list.}
+
+\descr{\lstinline|fun getBuffer (buf)|}{Gets the contents of a buffer as a list.}
+
+\descr{\lstinline|fun addBuffer (buf, x)|}{Adds an element \lstinline|x| to the end of buffer \lstinline|buf| and returns the updated buffer. The buffer \lstinline|buf| can be updated in-place.}
+
+\descr{\lstinline|fun concatBuffer (buf, x)|}{Adds buffer \lstinline|x| to the end of buffer \lstinline|buf| and returns the updated buffer. The buffer \lstinline|buf| can be updated in-place.}
+
+\descr{\lstinline|infixl <+> before + (b1, b2)|}{Infix synonym for \lstinline|concatBuffer|.}
+
+\descr{\lstinline|infix <+ at <+> (b, x)|}{Infix synonym for \lstinline|addBuffer|.}
+
+\section{Unit \texttt{Matcher}}
+
+The unit provides some primitives for matching strings against regular patterns. Matchers are immutable structures which store
+string buffers with current positions. Matchers are designed to be used as stream representation for
+parsers written using combinators of "\lstinline|Ostap|"; in particular, return values for "\lstinline|endOf|", "\lstinline|matchString|"
+and "\lstinline|matchRegexp|" respect the conventions for such parsers.
+
+\descr{\lstinline|fun createRegexp (r, name)|}{Creates an internal representation of regular expression; argument "\lstinline|r|" is a
+  string representation of regular expression (as per function "\lstinline|regexp|"), "\lstinline|name|"~--- a string name for
+diagnostic purposes.}
+
+\descr{\lstinline|fun initMatcher (buf)|}{Takes a string argument and returns a fresh matcher.}
+
+\descr{\lstinline|fun showMatcher (m)|}{Returns a printable representation for a matcher "\lstinline|m|" (for debugging purposes).}
+
+\descr{\lstinline|fun endOfMatcher (m)|}{Tests if the matcher "\lstinline|m|" reached the end of string. Return value represents parsing
+result as per "\lstinline|Ostap|".}
+
+\descr{\lstinline|fun matchString (m, s)|}{Tests if a matcher "\lstinline|m|" at current position matches the string "\lstinline|s|".
+Return value represents parsing result as per "\lstinline|Ostap|".}
+
+\descr{\lstinline|fun matchRegexp (m, r)|}{Tests if a matcher "\lstinline|m|" at current position matches the regular expression "\lstinline|r|", which
+  has to be constructed using the function "\lstinline|createRegexp|". Return value represents parsing result as per "\lstinline|Ostap|".}
+
+\descr{\lstinline|fun getLine (m)|}{Gets a line number for the current position of matcher "\lstinline|m|".}
+
+\descr{\lstinline|fun getCol (m)|}{Gets a column number for the current position of matcher "\lstinline|m|".}
+
+\section{Unit \texttt{Ostap}}
+\label{sec:ostap}
+
+Unit "\lstinline|Ostap|" implements monadic parser combinators in continuation-passing style with memoization~\cite{MonPC,MemoParsing,Meerkat}.
+A parser is a function of the shape
+
+\begin{lstlisting}
+    fun (k) {
+      fun (s) {...}
+    }
+\end{lstlisting}
+
+where "\lstinline|k|"~--- a \emph{continuation}, "\lstinline|s|"~--- an input stream. A parser returns either "\lstinline|Succ (v, s)|", where "\lstinline|v|"~--- some value,
+representing the result of parsing, "\lstinline|s|"~--- residual input stream, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a string, describing
+a parser error, "\lstinline|line|", "\lstinline|col|"~--- line and column at which the error was encountered.
+
+The unit describes some primitive parsers and combinators which allow to construct new parsers from existing ones.
+
+\descr{\lstinline|fun initOstap ()|}{Clears and initializes the internal memoization tables. Called implicitly at unit initiliation time.}
+
+\descr{\lstinline|fun memo (f)|}{Takes a parser "\lstinline|a|" and returns its memoized version. Needed for some parsers (for expamle, left-recursive ones).}
+
+\descr{\lstinline|fun token (x)|}{Takes a string or a representation of regular expression, returned by "\lstinline|createRegexp|" (see unit \texttt{Matcher}),
+  and returns a parser which recognizes exactly this string/regular expression.}
+
+\descr{\lstinline|fun eof (k)|}{A parser which recognizes the end of stream.}
+
+\descr{\lstinline|fun empty (k)|}{A parser which recognizes empty string.}
+
+\descr{\lstinline|fun loc (k)|}{A parser which returns the current position (a pair "\lstinline|[line, col]|") in a stream.}
+
+\descr{\lstinline|fun alt (a, b)|}{A parser combinator which constructs a parser alternating between "\lstinline|a|" and "\lstinline|b|".}
+
+\descr{\lstinline|fun seq (a, b)|}{A parser combinator which construct a sequential composition of "\lstinline|a|" and "\lstinline|b|". While
+  "\lstinline|a|" is a reqular parser,  "\lstinline|b|" is a \emph{function} which takes the result of parsing by "\lstinline|a|" and
+returns a parser (\emph{monadicity}).}
+
+\descr{\lstinline|infixr \| before !! (a, b)|}{Infix synonym for "\lstinline|alt|".}
+    
+\descr{\lstinline|infixr \|> after \| (a, b)|}{Infix synonym for "\lstinline|seq|".}
+
+\descr{\lstinline|infix @ at * (a, f)|}{An operation which attaches a semantics action "\lstinline|f|" to a parser "\lstinline|a|". Returns a
+parser which behaves exactly as "\lstinline|a|", but additionally applies "\lstinline|f|" to the result if the parsing is succesfull.}
+
+\descr{\lstinline|fun lift (f)|}{Lifts "\lstinline|f|" into a function which ignores its argument.}
+
+\descr{\lstinline|fun bypass (f)|}{Convert "\lstinline|f|" into a function which parser with "\lstinline|f|" but returns its argument.
+  Literally, "\lstinline|bypass (f) = fun (x) {f @ lift (x)}|"}
+
+\descr{\lstinline|fun opt (a)|}{For a parser "\lstinline|a|" returns a parser which parser either "\lstinline|a|" of empty string.}
+
+\descr{\lstinline|fun rep0 (a)|}{For a parser "\lstinline|a|" returns a parser which parser a zero or more repetitions of "\lstinline|a|"}
+
+\descr{\lstinline|fun rep (a)|}{For a parser "\lstinline|a|" returns a parser which parser a one or more repetitions of "\lstinline|a|"}
+
+\descr{\lstinline|fun listBy (item, sep)|}{Constructs a parser which parses a non-empty list of "\lstinline|item|" delimited by "\lstinline|sep|".} 
+
+\descr{\lstinline|fun list0By (item, sep)|}{Constructs a parser which parses a possibly empty list of "\lstinline|item|" delimited by "\lstinline|sep|".} 
+
+\descr{\lstinline|fun list (item)|}{Constructs a parser which parses a non-empty list of "\lstinline|item|" delimited by ",".} 
+
+\descr{\lstinline|fun list0 (item)|}{Constructs a parser which parses a possibly empty list of "\lstinline|item|" delimited by ",".} 
+
+\descr{\lstinline|fun parse (p, m)|}{Parsers a matcher "\lstinline|m|" with a parser "\lstinline|p|". Returns ether "\lstinline|Succ (v)|" where
+  "\lstinline|v|"~--- a parsed value, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a stirng describing parse error, "\lstinline|line|",
+  "\lstinline|col|"~--- this error's coordinates. This function may fail if detects the ambiguity of parsing.}
+
+\descr{\lstinline|fun parseString (p, s)|}{Parsers a string "\lstinline|s|" with a parser "\lstinline|p|". Returns ether "\lstinline|Succ (v)|" where
+  "\lstinline|v|"~--- a parsed value, or "\lstinline|Fail (err, line, col)|", where "\lstinline|err|"~--- a stirng describing parse error, "\lstinline|line|",
+  "\lstinline|col|"~--- this error's coordinates. This function may fail if detects the ambiguity of parsing.}
+
+\newsavebox\exprbox
+
+\begin{lrbox}{\exprbox}
+\begin{lstlisting}
+    {[Left, {[token ("+"), fun (l, op, r) {Add (l, r)}],
+             [token ("-"), fun (l, op, r) {Sub (l, r)}]
+            }],
+     [Left, {[token ("*"), fun (l, op, r) {Mul (l, r)}],
+             [token ("/"), fun (l, op, r) {Div (l, r)}]
+            }]}
+\end{lstlisting}
+\end{lrbox}
+
+\descr{\lstinline|fun expr (ops, opnd)|}{A super-combinator to generate infix expression parsers. The argument "\lstinline|opnd|" parses primary operand, "\lstinline|ops|" is
+  a list of infix operator descriptors. Each element of the list describes one \emph{precedence level} with precedence increasing from head to tail. A descriptor on
+  each level is a pair, where the first element describes the associativity at the given level ("\lstinline|Left|", "\lstinline|Right|" or "\lstinline|Nona|") and
+  the second element is a list of pairs~--- a parser for an infix operator and the semantics action (a three-argument function accepting the left parser operand, that that
+  infix operator parser returns, and the right operand). For example,
+
+  \usebox\exprbox
+
+  specifies two levels of precedence, both left-associative, with infix operators "\lstinline|+|" and "\lstinline|-|" at the first level and
+  "\lstinline|*|" and "\lstinline|/|" at the second. The semantics for these operators constructs abstract syntax trees (in this particular example the
+  second argument of semantics functions is unused).
+}
+
+\section{Unit \texttt{Ref}}
+
+The unit provides an emulation for first-class references.
+
+\descr{\lstinline|fun ref (x)|}{Creates a mutable reference with the contents "\lstinline|x|".}
+
+\descr{\lstinline|fun deref (x)|}{Dereferences a reference "\lstinline|x|" and returns stored value.}
+
+\descr{\lstinline|infix ::= before := (x, y)|}{Assigns a value "\lstinline|y|" to a cell designated by the "\lstinline|x|". Returns "\lstinline|y|".}
+

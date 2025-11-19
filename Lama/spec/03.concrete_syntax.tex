@@ -1,0 +1,27 @@
+\chapter{Concrete Syntax and Semantics}
+\label{sec:concrete_syntax}
+
+In this chapter we describe the concrete syntax of the language as it is recognized by the parser. In the
+syntactic description we will use the extended Backus-Naur form with the following conventions:
+
+\begin{itemize}
+\item nonterminals are presented in \nonterm{italics};
+\item concrete terminals are \term{grayed out};
+\item classes of terminals are \token{CAPITALIZED};
+\item a postfix ``$^\star$'' designates zero-or-more repetitions;
+\item square brackets ``$[\dots]$'' designate zero-or-one repetition;
+\item round brackets ``$(\dots)$'' are used for grouping;
+\item alteration is denoted by ``$\alt$'', sequencing by juxtaposition;
+\item a colon ``$:$'' separates a nonterminal being defined from its definition.
+\end{itemize}
+
+In the description below we will take in-line code samples in blockquotes "..." which are not considered as a
+part of the concrete syntax.
+
+\input{03.01.lexical_structure}
+\input{03.02.compilation_units}
+\input{03.03.scope_expressions}
+\input{03.04.expressions}
+
+
+

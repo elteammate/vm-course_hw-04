@@ -1,0 +1,22 @@
+(rule
+ (targets Sort.exe)
+ (deps
+  (:lama Sort.lama)
+  ../runtime/runtime.a
+  ../stdlib/x64/Fun.i)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   LAMA
+   "../runtime"
+   (run
+    %{project_root}/src/Driver.exe
+    -64
+    %{lama}
+    -I
+    ../stdlib/x64
+    -runtime
+    ../runtime
+    -o
+    %{targets}))))

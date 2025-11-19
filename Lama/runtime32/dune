@@ -1,0 +1,17 @@
+(rule
+ (target runtime.a)
+ (enabled_if
+  (= %{system} "linux"))
+ (mode
+  (promote (until-clean)))
+ (deps Makefile gc_runtime.s runtime.c runtime.h)
+ (action
+  (run make -j2)))
+
+(install
+ (section share)
+ (enabled_if
+  (= %{system} "linux"))
+ (files
+  (runtime.a as x32/runtime.a)
+  (Std.i as x32/Std.i)))
