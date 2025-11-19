@@ -1,0 +1,214 @@
+% !TEX TS-program = pdflatex
+% !TeX spellcheck = en_US
+% !TEX root = lama-spec.tex
+\chapter{Extensions}
+\label{sec:extensions}
+
+There are some extensions for the core language defined in the previous chapters. These
+extensions add some syntactic sugar, which makes writing programs in \lama a less
+painful task.
+
+\section{Custom Infix Operators}
+\label{sec:custom_infix}
+
+Besides the set of builtin infix operators (see Fig.~\ref{builtin_infixes}) users may define
+custom infix operators. These operators may be declared at any scope level; when defined
+at the top level they can be exported as well. However, there are some restrictions regarding the
+redefinition of builtin infix operators:
+
+\begin{itemize}
+\item redefinitions of builtin infix operators can not be exported;
+\item the assignment operator "\lstinline|:=|" can not be redefined;
+\item infix definitions can not be mutually recursive (but this can be worked around by
+  definining infix synonyms for mutually-recursive functions).
+\end{itemize}
+
+The syntax for infix operator definition is shown in Fig.~\ref{custom_infix_construct}; a custom infix definition must specify exactly two arguments.
+An associativity and precedence level has to be assigned to each custom infix operator. A precedence level is assigned by specifying at which
+position, relative to other known infix operators, the operator being defined is inserted. Three kinds of specifications are allowed: at given level,
+immediately before or immediately after. For example, "\lstinline|at +|" means that the operator is assigned exactly the same
+level of precedence as "\lstinline|+|"; "\lstinline|after +|" creates a new precedence level immediately \emph{after} that for
+"\lstinline|+|" (but \emph{before} that for "\lstinline|*|"), and "\lstinline|before *|" has exactly the same effect (provided
+there were no insertions of precedence levels between those for "\lstinline|+|" and "\lstinline|*|").
+
+When being inserted at an existing precedence level, an infix operator inherits the associativity from that level; hence, only "\lstinline|infix|"
+keyword can be used for such definitions. When a new level is created, an associativity for this level has to be additionally specified
+by using corresponding keyword ("\lstinline|infix|" for non-associative levels, "\lstinline|infixr|"~--- for levels with right
+associativity, and "\lstinline|infixl|"~--- for levels with left associativity).
+
+When public infix operators are exported, their relative precedence levels and associativity are exported as well; since not all 
+custom infix definitions may be made public some levels may disappear from the export. For example, let us have the following definitions:
+
+\begin{lstlisting}
+    infixl ** before * (x, y) {...}
+    public infixr *** before ** (x, y) {...}
+\end{lstlisting}
+
+Here in the top scope for the compilation unit we have two additional precedence levels: one for the "\lstinline|**|" and another for the "\lstinline|***|".
+However, as  "\lstinline|**|" is not exported its precedence level will be forgotten during the import. Thus, only the precedence level for
+"\lstinline|***|" will be created during the import as if is was defined at the level  "\lstinline|before *|".
+
+Respectively, multiple imports of units with custom infix operators will modify the precedence level in the order of their import. For example,
+if there are two units  "\lstinline|A|" and  "\lstinline|B|" with declarations "\lstinline|infixl ++ before +|" and "\lstinline|infixl +++ before +|"
+correspondingly, then importing  "\lstinline|A|" after  "\lstinline|B|" will result in "\lstinline|++|" having a \emph{lower} precedence, then
+"\lstinline|+++|".
+
+\begin{figure}[t]
+  \[
+    \begin{array}{rcl}
+      \defterm{infixDefinition} & : & \nonterm{infixHead}\s\term{(}\s\nonterm{functionArguments}\s\term{)}\s\nonterm{functionBody}\\
+      \defterm{infixHead}       & : & [\s\term{public}\s]\s\nonterm{infixity}\s\token{INFIX}\s\nonterm{level}\\
+      \defterm{infixity}        & : & \term{infix}\alt\term{infixl}\alt\term{infixr}\\
+      \defterm{level}           & : & [\s\term{at}\alt\term{before}\alt\term{after}\s]\s\token{INFIX}
+    \end{array}
+  \]
+  \caption{The Syntax for Infix Operator Definition}
+  \label{custom_infix_construct}
+\end{figure}
+
+\section{Lazy Values and Eta-expansion}
+
+An expression
+
+\begin{lstlisting}
+    lazy$\;e$
+\end{lstlisting}
+
+where $e$~--- a $\nonterm{basicExpression}$~--- is converted into
+
+\begin{lstlisting}
+    makeLazy (fun () {$e$})    
+\end{lstlisting}
+
+where "\lstinline|makeLazy|"~--- a function from standard unit "\lstinline|Lazy|" (see Section~\ref{sec:std:lazy}). An import for
+"\lstinline|Lazy|" is added implicitly.
+
+An expression
+
+\begin{lstlisting}
+    eta$\;e$
+\end{lstlisting}
+
+where $e$~--- a $\nonterm{basicExpression}$~--- is converted into
+
+\begin{lstlisting}
+    fun ($x$) {$e$ ($x$)})    
+\end{lstlisting}
+
+where "$x$"~--- a fresh variable which does not occur free in "$e$".
+
+\section{Dot Notation}
+\label{sec:dot-notation}
+
+A function call
+
+\begin{lstlisting}
+    $f$ ($e_1$, ..., $e_k$)
+\end{lstlisting}
+
+where $f$~--- an identifier~--- can be rewritten as
+
+\begin{lstlisting}
+    $e_1$.$f$ ($e_2$, ..., $e_k$)
+\end{lstlisting}
+
+In particular, a call to a one-argument function $f (e)$ can be rewritten as $e.f$.
+
+\section{Patterns in Function Arguments}
+
+Patterns can be used in function argument specification: a declaration
+
+\begin{lstlisting}
+    fun f ($p_1$, ..., $p_k$) { e }
+\end{lstlisting}
+
+is equivalent to
+
+\begin{lstlisting}
+    fun f ($x_1$, ..., $x_k$) {
+      case $x_1$ of
+        $p_1$ -> case $x_2$ of
+                   ... -> e
+                 esac
+      esac
+    }
+\end{lstlisting}
+
+where $x_i$~--- fresh variables, not free in $e$.
+
+\section{Syntax Definitions}
+
+Syntax definition extension represents an alternative simplified syntax for parsers written using standard unit \lstinline|Ostap| (see Section~\ref{sec:ostap}).
+The syntax for syntax definition expressions is shown in Fig.~\ref{syntax_expressions}.
+
+\begin{figure}[h]
+  \[
+    \begin{array}{rcll}
+      \defterm{syntaxExpression}  & : & \term{syntax}\s\term{(}\s\nonterm{syntaxSeq}\s(\s\term{$\mid$}\s\nonterm{syntaxSeq}\s)^*\s\term{)}&\\
+      \defterm{syntaxSeq}         & : & \nonterm{syntaxBinding}^+\s[\s\term{\{}\s\nonterm{expression}\s\term{\}}\s]&\\
+      \defterm{syntaxBinding}     & : & [\s\term{-}\s]\s[\s\nonterm{pattern}\s\term{=}\s]\s\s\nonterm{syntaxPostfix}&\\
+      \defterm{syntaxPostfix}     & : & \nonterm{syntaxPrimary}\s[\s\term{*}\s\alt\s\term{+}\s\alt\s\term{?}\s]&\\
+      \defterm{syntaxPrimary}     & : & \token{LIDENT}\s(\s\term{[}\s[\s\nonterm{expression}\s(\s\term{,}\s\nonterm{expression}\s)^*\s]\s\term{]}\s)^*&\alt\\
+                                  &   & \term{(}\s\nonterm{syntaxSeq}\s\term{)}&\alt\\
+                                  &   & \term{\$(}\s\nonterm{expression}\s\term{)}&
+    \end{array}
+  \]
+  \caption{Syntax definition expressions}
+  \label{syntax_expressions}
+\end{figure}
+
+Syntax expressions can be used wherever regular expressions are allowed. Each syntax expressions is expanded in a certain combination of \lstinline|Ostap| primitives.
+For example,
+
+\begin{lstlisting}
+    fun sum (str) {
+      parseString (
+        syntax (l=DECIMAL token["+"] r=DECIMAL eof {
+                  stringInt (l) + stringInt (r)
+               }),
+        str
+      )
+    }
+\end{lstlisting}
+
+defines a function which parses its arguments into an expression \lstinline|"l + r"|, where \lstinline|l| and \lstinline|r| are decimal literals, and evaluates its value.
+
+A syntax expression itself is a sequence of alternatives, and each alternative is a sequential composition (\nonterm{syntaxSeq}) of primitive parsers equipped with optional
+semantic action (a \emph{general} expression in curly brackets).
+
+A primitive parser is either an l-indentfier (possibly supplied with arguments), or a \emph{general} expression, surrounded by brackets \term{\$(}..\term{)},
+or a \emph{syntax} expression, surrounded by round brackets. Note, the arguments for primitive parsers in syntax expressions are surrounded by
+\term{[}..\term{]} unlike general expressions; thus
+
+\begin{lstlisting}
+   x ("a")
+\end{lstlisting}
+
+means a sequential composition of \lstinline|x| and "\lstinline|a|", not a combinator \lstinline|x| applied to "\lstinline|a|". 
+
+A primitive parser can be followed by one of postfix operators ("\term{*}", "\term{+}", or "\term{?}"), corresponding
+to "\lstinline|rep0|",  "\lstinline|rep|", or "\lstinline|opt|" combinators of \lstinline|Ostap| respectively, for example
+
+\begin{lstlisting}
+   token["a"]+
+   identifier? 
+\end{lstlisting}
+
+A value recognized by a primitive parser can be matched against a pattern, for example
+
+\begin{lstlisting}
+   value=(identifier | constant)
+   h:tl=item+
+\end{lstlisting}
+
+The bindings provided by pattern-matching can be used in semantic actions.
+
+Finally, if no semantic action is given, a sequential syntax expression returns a tuple of its components. However, if a parser
+in a sequential composition is preceded by "\term{-}" then its value is not included into the default result. Thus,
+
+\begin{lstlisting}
+   parse -eof
+\end{lstlisting}
+
+returns what "\lstinline|parse|" recognized; the input stream is parsed against "\lstinline|eof|", but the result of "\lstinline|eof|"
+is omitted.

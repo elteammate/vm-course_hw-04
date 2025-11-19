@@ -1,0 +1,222 @@
+% !TEX TS-program = pdflatex
+% !TeX spellcheck = en_US
+% !TEX root = lama-spec.tex
+\documentclass{book}
+
+\newcommand\hmmax{0}
+\newcommand\bmmax{0}
+
+\usepackage{amssymb, amsmath}
+\usepackage{alltt}
+\usepackage{pslatex}
+\usepackage{epigraph}
+\usepackage{verbatim}
+\usepackage{latexsym}
+\usepackage{array}
+\usepackage{comment}
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{verbatim}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{stmaryrd}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{graphicx}
+\usepackage{euscript}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{multirow,bigdelim}
+\usepackage{subcaption}
+\usepackage{placeins}
+\usepackage{xspace}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{mathpazo}
+
+\definecolor{shadecolor}{gray}{1.00}
+\definecolor{darkgray}{gray}{0.30}
+
+\def\transarrow{\xrightarrow}
+\newcommand{\setarrow}[1]{\def\transarrow{#1}}
+
+\def\padding{\phantom{X}}
+\newcommand{\setpadding}[1]{\def\padding{#1}}
+
+\def\subarrow{}
+\newcommand{\setsubarrow}[1]{\def\subarrow{#1}}
+
+\newcommand{\trule}[2]{\dfrac{#1}{#2}}
+\newcommand{\crule}[3]{\frac{#1}{#2},\;{#3}}
+\newcommand{\withenv}[2]{{#1}\vdash{#2}}
+\newcommand{\trans}[3]{{#1}\transarrow{\padding{\textstyle #2}\padding}{\subarrow}{#3}}
+\newcommand{\ctrans}[4]{{#1}\transarrow{\padding#2\padding}\subarrow{#3},\;{#4}}
+\newcommand{\llang}[1]{\mbox{\lstinline[language=abslama,mathescape]|#1|}}
+\newcommand{\pair}[2]{\inbr{{#1}\mid{#2}}}
+\newcommand{\inbr}[1]{\left<{#1}\right>}
+\newcommand{\highlight}[1]{\color{red}{#1}}
+\newcommand{\ruleno}[1]{\eqno[\scriptsize\textsc{#1}]}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\inmath}[1]{\mbox{$#1$}}
+\newcommand{\lfp}[1]{fix_{#1}}
+\newcommand{\gfp}[1]{Fix_{#1}}
+\newcommand{\vsep}{\vspace{-2mm}}
+\newcommand{\supp}[1]{\scriptsize{#1}}
+\newcommand{\sembr}[1]{\llbracket{#1}\rrbracket}
+\newcommand{\cd}[1]{\texttt{#1}}
+\newcommand{\free}[1]{\boxed{#1}}
+\newcommand{\binds}{\;\mapsto\;}
+\newcommand{\dbi}[1]{\mbox{\bf{#1}}}
+\newcommand{\sv}[1]{\mbox{\textbf{#1}}}
+\newcommand{\bnd}[2]{{#1}\mkern-9mu\binds\mkern-9mu{#2}}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newcommand{\meta}[1]{{\mathcal{#1}}}
+\renewcommand{\emptyset}{\varnothing}
+\newcommand{\dom}[1]{\mathtt{dom}\;{#1}}
+\newcommand{\primi}[2]{\mathbf{#1}\;{#2}}
+\newcommand{\con}[1]{\mathbf{#1}}
+\newcommand{\lama}{$\lambda\kern -.1667em\lower -.5ex\hbox{$a$}\kern -.1000em\lower .2ex\hbox{$\mathcal M$}\kern -.1000em\lower -.5ex\hbox{$a$}$\xspace}
+%\newcommand{\sial}{S\textit{\lower -.5ex\hbox{I}\kern -.1667em\lower .5ex\hbox {A}}\kern -.125emL\@\xspace}
+\definecolor{light-gray}{gray}{0.90}
+\newcommand{\graybox}[1]{\colorbox{light-gray}{#1}}
+
+\newcommand{\defterm}[1]{\textit{#1}}
+\newcommand{\nonterm}[1]{\textit{#1}}
+\newcommand{\term}[1]{\graybox{#1}}
+\newcommand{\token}[1]{\textsc{#1}}
+\newcommand{\alt}{\s\mid\s}
+\newcommand{\s}{\:\:}
+
+\newcommand{\descr}[2]{\smallskip{#1}\begin{itemize}[noitemsep,topsep=0pt]\item[]{#2}\end{itemize}}
+
+\lstdefinelanguage{abslama}{
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,let,in,
+box,val,var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax,ref,ignore,elemRef},
+sensitive=true,
+basicstyle=\small,
+%commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={->}{{$\to$}}3,
+morecomment=[s][\ttfamily]{(*}{*)},
+morecomment=[l][\ttfamily]{--}
+}
+
+\lstdefinelanguage{lama}{
+keywords={skip,if,then,else,elif,fi,while,do,od,for,fun,public,import,let,in,
+box,val,var,case,of,esac,when,box,str,sexp,array,infix,infixl,infixr,at,before,after,true,false,eta,lazy,syntax},
+sensitive=true,
+basicstyle=\small,
+%commentstyle=\scriptsize\rmfamily,
+keywordstyle=\ttfamily\bfseries,
+identifierstyle=\ttfamily,
+basewidth={0.5em,0.5em},
+columns=fixed,
+fontadjust=true,
+literate={->}{{$\to$}}3,
+morecomment=[s][\ttfamily]{(*}{*)},
+morecomment=[l][\ttfamily]{--}
+}
+
+\lstset{
+mathescape=true,
+basicstyle=\small,
+identifierstyle=\ttfamily,
+keywordstyle=\bfseries,
+commentstyle=\scriptsize\rmfamily,
+basewidth={0.5em,0.5em},
+fontadjust=true,
+escapechar=!,
+language=lama
+}
+
+\sloppy
+
+%\title{\lama Language Definition}
+
+%\author{Dmitry Boulytchev}
+
+\begin{document}
+
+\begin{titlepage} % Suppresses displaying the page number on the title page and the subsequent page counts as page 1
+	\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for horizontal lines, change thickness here
+	
+	\center % Centre everything on the page
+	
+	%------------------------------------------------
+	%	Headings
+	%------------------------------------------------
+
+	\includegraphics[scale=0.5]{jetbrains.png}\\[3cm]
+%	\textsc{\LARGE JetBrains Research}\\[2.5cm] % Main heading such as the name of your university/college
+	
+%	\textsc{\Large Major Heading}\\[0.5cm] % Major heading such as course name
+	
+%	\textsc{\large Minor Heading}\\[0.5cm] % Minor heading such as course title
+	
+	%------------------------------------------------
+	%	Title
+	%------------------------------------------------
+	
+	\HRule\\[0.4cm]
+	
+	{\huge\bfseries \lama Language Specification}\\[0.4cm] % Title of your document
+
+        {\textsc{Version 1.30}}
+        
+	\HRule\\[1.5cm]
+	
+	%------------------------------------------------
+	%	Author(s)
+	%------------------------------------------------
+	
+	\begin{minipage}{0.4\textwidth}
+		\begin{flushleft}
+			\large
+			\textit{Author}\\
+			Dmitry \textsc{Boulytchev} % Your name
+		\end{flushleft}
+	\end{minipage}
+	
+	%------------------------------------------------
+	%	Date
+	%------------------------------------------------
+	
+	\vfill\vfill\vfill % Position the date 3/4 down the remaining page
+	
+	{\large\input{commitdate}} % Date, change the \today to a set date if you want to be precise
+	
+	%------------------------------------------------
+	%	Logo
+	%------------------------------------------------
+	
+	%\vfill\vfill
+	%\includegraphics[width=0.2\textwidth]{placeholder.jpg}\\[1cm] % Include a department/university logo - this will require the graphicx package
+	 
+	%----------------------------------------------------------------------------------------
+	
+	\vfill % Push the date up 1/4 of the remaining page
+	
+\end{titlepage}
+
+\tableofcontents
+
+\input{01.introduction}
+%\input{02.abstract_syntax_and_semantics}
+\input{03.concrete_syntax}
+\input{04.extensions}
+\input{05.driver_options}
+\input{06.limitations}
+\input{07.debugging}
+\input{08.standard_library}
+
+\bibliographystyle{plainurl}
+\bibliography{lama-spec}
+
+\end{document}
