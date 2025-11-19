@@ -1,0 +1,10 @@
+fun f(x) {
+    x
+}
+
+fun g(x, y) {
+    var z = 0;
+    x + y + z
+}
+
+f(g(5, 3))
