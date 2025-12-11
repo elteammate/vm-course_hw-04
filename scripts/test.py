@@ -19,7 +19,7 @@ def main():
         with open(result, "w") as out:
             try:
                 subprocess.run([
-                    "cmake-build-debug/vm_course_02",
+                    "cmake-build-debug/hw",
                     result_bytecode.absolute(),
                 ], stdout=out, input=test.input_.encode()).check_returncode()
             except Exception as e:

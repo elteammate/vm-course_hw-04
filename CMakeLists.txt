@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_subdirectory(runtime)
 
-# add_definitions(-O2)
+add_definitions(-O2 -DNDEBUG)
 # add_compile_options(-fsanitize=address)
 # add_link_options(-fsanitize=address)
 add_executable(hw main.cpp)

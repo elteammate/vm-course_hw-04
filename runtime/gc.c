@@ -28,7 +28,7 @@ size_t cur_id = 0;
 static extra_roots_pool extra_roots;
 
 // size_t __gc_stack_top = 0, __gc_stack_bottom = 0;
-#define __gc_stack_top ((void *)vm.stack)
+#define __gc_stack_top ((void *)(vm.stack - 1))
 #define __gc_stack_bottom ((void *)vm.sp)
 
 #ifdef LAMA_ENV

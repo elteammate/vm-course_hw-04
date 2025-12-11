@@ -20,7 +20,7 @@ groups = [
 ]
 
 
-temp_dir = Path("/tmp/hw-02")
+temp_dir = Path("/tmp/hw-04")
 temp_dir.mkdir(exist_ok=True)
 
 
@@ -134,17 +134,17 @@ def ensure_compiled():
         "--build",
         "cmake-build-debug",
         "--target",
-        "vm_course_02",
+        "hw",
     ]).check_returncode()
-    subprocess.run([
-        "gcc",
-        "Lama/byterun/byterun.c",
-        "Lama/runtime/runtime.a",
-        "-I",
-        "Lama/runtime",
-        "-o",
-        "byterun.out",
-    ]).check_returncode()
+    # subprocess.run([
+    #     "gcc",
+    #     "Lama/byterun/byterun.c",
+    #     "runtime/runtime.a",
+    #     "-I",
+    #     "runtime",
+    #     "-o",
+    #     "byterun.out",
+    # ]).check_returncode()
 
 
 def generate_bytecode(source: str | Path, output: Optional[Path] = None) -> Path:
