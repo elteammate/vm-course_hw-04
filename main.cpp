@@ -688,6 +688,9 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
     SIMPLE_OP(Op::BUILTIN_LENGTH, 1, 1)
     SIMPLE_OP(Op::BUILTIN_STRING, 1, 1)
     SIMPLE_OP(Op::BUILTIN_ARRAY, bc.get_arg(offset + 1), 1)
+
+    default:
+        return report_error(state, "Invalid opcode");
     }
 }
 
