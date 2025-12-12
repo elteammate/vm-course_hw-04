@@ -144,10 +144,21 @@ struct Bytecode {
     usize globals_size;
     Meta meta;
 
-    [[nodiscard]] char *get_string(i32 offset) const {
+    [[nodiscard]] std::optional<std::string> check_string(i32 offset) const {
         if (offset < 0 || offset >= strings_size) [[unlikely]] {
-            throw std::runtime_error(std::format("String offset 0x{:08x} is out of bounds", offset));
+            return std::format("String offset 0x{:08x} is out of bounds", offset);
         }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] char *get_string(i32 offset) const {
+        if (auto err = check_string(offset); err.has_value()) [[unlikely]] {
+            throw std::runtime_error(err.value());
+        }
+        return strings + offset;
+    }
+
+    [[nodiscard]] char *get_string_unchecked(i32 offset) const {
         return strings + offset;
     }
 
@@ -162,7 +173,7 @@ struct Bytecode {
     }
 
     [[nodiscard]] u8 get_byte(i32 offset) const {
-        if (offset < 0 || offset + 1 > code_size) [[unlikely]] {
+        if (offset < 0 || offset >= code_size) [[unlikely]] {
             throw std::runtime_error(std::format("Code offset 0x{:08x} is out of bounds", offset));
         }
         return code[offset];
@@ -202,13 +213,29 @@ void bytecode_from_bytes(void *buffer, usize size) {
     bc.public_table_size = header.public_table_size;
     bc.strings = (char *)((u8 *)bc.public_table + sizeof(PublicEntry) * bc.public_table_size);
     bc.strings_size = header.strings_size;
+    while (bc.strings[bc.strings_size - 1] != '\0' && bc.strings_size > 0) {
+        bc.strings_size--;
+    }
     bc.code = (u8 *)bc.strings + bc.strings_size;
 
     if (size < (usize)(bc.code - (u8 *)buffer)) {
         throw std::runtime_error("Code section does not fit in bytecode");
     }
 
+    if (header.strings_size > INT32_MAX - 8) {
+        throw std::runtime_error("String section is too large");
+    }
+    if (header.globals_size > INT32_MAX - 8) {
+        throw std::runtime_error("Global section is too large");
+    }
+    if (header.public_table_size > INT32_MAX - 8) {
+        throw std::runtime_error("Public table is too large");
+    }
+
     bc.code_size = size - (usize)(bc.code - (u8 *)buffer);
+    if (bc.code_size > INT32_MAX - 8) {
+        throw std::runtime_error("Code section is too large");
+    }
     bc.globals_size = header.globals_size;
     bc.meta = Meta{
         .stage = 0,
@@ -365,20 +392,32 @@ constexpr i32 MAX_LOCALS = 0xFFFF;
 struct SymbolicInterpState {
     i32 offset;
     i32 fn;
-    i32 stack_depth;
+};
+
+struct ForkedState {
+    SymbolicInterpState state;
+    i32 depth;
 };
 
 struct OpInfo {
     i32 new_stack_depth;  // STACK_DEPTH_UNK if execution does not continue
-    std::optional<SymbolicInterpState> forks_execution;
+    std::optional<ForkedState> forks_execution;
 };
 
 i32 get_depth(i32 offset) {
     return bc.meta.data[offset];
 }
 
-void set_depth(i32 offset, i32 stack_depth) {
-    bc.meta.data[offset] = stack_depth;
+std::variant<bool, std::string> update_depth(i32 offset, i32 stack_depth) {
+    auto &slot = bc.meta.data[offset];
+    if (slot != NUM_UNK) {
+        if (slot != stack_depth) {
+            return std::format("Stack depth mismatch at offset 0x{:08x} ({} vs {})", offset, slot, offset);
+        }
+        return true;
+    }
+    slot = stack_depth;
+    return false;
 }
 
 i32 get_num_captures(i32 fn_offset) {
@@ -406,8 +445,7 @@ std::optional<std::string> set_num_captures(i32 fn_offset, i32 num_captures) {
 
 std::string report_error(const SymbolicInterpState &state, std::string message) {
     return std::format("Error at offset 0x{:08x}: {}\n", state.offset, message)
-        + std::format("Current function offset: 0x{:08x}\n", state.fn)
-        + std::format("Stack depth: {}\n", state.stack_depth);
+        + std::format("Current function offset: 0x{:08x}\n", state.fn);
 }
 
 u32 pack_begin_params(i32 num_args, i32 stack_depth) {
@@ -485,20 +523,14 @@ std::optional<std::string> check_capture_access(const SymbolicInterpState &state
     return std::nullopt;
 }
 
-std::optional<std::string> check_valid_string(const SymbolicInterpState &state, i32 offset) {
-    if (offset < 0 || offset >= bc.strings_size) {
-        return report_error(state, "String index out of bounds");
-    }
-    return std::nullopt;
-}
-
 std::variant<OpInfo, std::string> get_op_info(const SymbolicInterpState &state, i32 offset) {
+    i32 depth = get_depth(offset);
 
 #define VALIDATED2_OP(op, num_consume, num_produce, validation1, validation2) \
 case op: { \
     i32 _consume = (num_consume); \
     i32 _produce = (num_produce); \
-    if (state.stack_depth < _consume) { \
+    if (depth < _consume) { \
         return report_error(state, "Stack underflow in " #op); \
     } \
     if (std::optional<std::string> err = (validation1); err.has_value()) { \
@@ -508,7 +540,7 @@ case op: { \
         return err.value(); \
     } \
     return OpInfo{ \
-        .new_stack_depth = state.stack_depth - (_consume - _produce), \
+        .new_stack_depth = depth - (_consume - _produce), \
         .forks_execution = std::nullopt \
     }; \
 }
@@ -535,8 +567,8 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
     SIMPLE_OP(Op::BINOP_OR, 2, 1)
 
     SIMPLE_OP(Op::CONST, 0, 1)
-    VALIDATED_OP(Op::STRING, 0, 1, check_valid_string(state, bc.get_arg(offset + 1)))
-    VALIDATED_OP(Op::SEXP, bc.get_arg(offset + 5), 1, check_valid_string(state, bc.get_arg(offset + 1)))
+    VALIDATED_OP(Op::STRING, 0, 1, bc.check_string(bc.get_arg(offset + 1)))
+    VALIDATED_OP(Op::SEXP, bc.get_arg(offset + 5), 1, bc.check_string(bc.get_arg(offset + 1)))
     SIMPLE_OP(Op::STA, 3, 1)
 
     case Op::JMP: {
@@ -546,16 +578,18 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         }
         return OpInfo{
             .new_stack_depth = STACK_DEPTH_UNK,
-            .forks_execution = SymbolicInterpState{
-                .offset = target,
-                .fn = state.fn,
-                .stack_depth = state.stack_depth,
+            .forks_execution = ForkedState{
+                .state = SymbolicInterpState{
+                    .offset = target,
+                    .fn = state.fn,
+                },
+                .depth = depth,
             },
         };
     }
 
     case Op::END:
-        if (state.stack_depth != 1) {
+        if (depth != 1) {
             return report_error(state, "Stack depth is not 1 at END instruction");
         }
         return OpInfo{
@@ -590,21 +624,31 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (target < 0 || target >= bc.code_size) {
             return report_error(state, "Invalid target offset");
         }
-        if (state.stack_depth == 0) {
+        if (depth < 1) {
             return report_error(state, "Stack underflow");
         }
         return OpInfo{
-            .new_stack_depth = state.stack_depth - 1,
-            .forks_execution = SymbolicInterpState{
-                .offset = target,
-                .fn = state.fn,
-                .stack_depth = state.stack_depth - 1,
+            .new_stack_depth = depth - 1,
+            .forks_execution = ForkedState{
+                .state = SymbolicInterpState{
+                    .offset = target,
+                    .fn = state.fn,
+                },
+                .depth = depth - 1,
             },
         };
     }
 
-    SIMPLE_OP(Op::BEGIN, 0, 0)
-    SIMPLE_OP(Op::CBEGIN, 0, 0)
+    case Op::BEGIN:
+    case Op::CBEGIN: {
+        if (depth != STACK_DEPTH_CALL) {
+            return report_error(state, "Stack depth is not canary at BEGIN or CBEGIN instruction");
+        }
+        return OpInfo{
+            .new_stack_depth = 0,
+            .forks_execution = std::nullopt,
+        };
+    }
 
     case Op::CLOSURE: {
         i32 fn = bc.get_arg(offset + 1);
@@ -622,7 +666,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (auto err = set_num_captures(fn, num_captures); err.has_value()) {
             return *err;
         }
-        update_max_stack_depth(state.fn, state.stack_depth + num_captures + 1);
+        update_max_stack_depth(state.fn, depth + num_captures + 1);
         for (i32 i = 0, designator_offset = offset + 9; i < num_captures; i++, designator_offset += 5) {
             i32 addr = bc.get_arg(designator_offset + 1);
             if (u8 designator = bc.get_byte(designator_offset); designator == 0) {
@@ -646,11 +690,13 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             }
         }
         return OpInfo{
-            .new_stack_depth = state.stack_depth + 1,
-            .forks_execution = SymbolicInterpState{
-                .offset = fn,
-                .fn = fn,
-                .stack_depth = STACK_DEPTH_CALL,
+            .new_stack_depth = depth + 1,
+            .forks_execution = ForkedState{
+                .state = SymbolicInterpState{
+                    .offset = fn,
+                    .fn = fn,
+                },
+                .depth = STACK_DEPTH_CALL,
             },
         };
     }
@@ -659,12 +705,12 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (num_args > MAX_LOCALS) {
             return report_error(state, "Too many arguments");
         }
-        if (state.stack_depth < num_args + 1) {
+        if (depth < num_args + 1) {
             return report_error(state, "Stack underflow");
         }
-        update_max_stack_depth(state.fn, state.stack_depth - num_args + 2);
+        update_max_stack_depth(state.fn, depth - num_args + 2);
         return OpInfo{
-            .new_stack_depth = state.stack_depth - num_args,
+            .new_stack_depth = depth - num_args,
             .forks_execution = std::nullopt,
         };
     }
@@ -674,7 +720,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             return report_error(state, "Invalid function offset");
         }
         i32 num_args = bc.get_arg(offset + 5);
-        if (state.stack_depth < num_args) {
+        if (depth < num_args) {
             return report_error(state, "Stack underflow");
         }
         if (num_args > MAX_LOCALS) {
@@ -688,16 +734,17 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             return report_error(state, "Function must start with BEGIN");
         }
         return OpInfo{
-            .new_stack_depth = state.stack_depth - num_args + 1,
-            .forks_execution = SymbolicInterpState{
-                .offset = fn,
-                .fn = fn,
-                .stack_depth = STACK_DEPTH_CALL,
+            .new_stack_depth = depth - num_args + 1,
+            .forks_execution = ForkedState{
+                SymbolicInterpState{
+                    .offset = fn,
+                    .fn = fn,
+                }, STACK_DEPTH_CALL
             },
         };
     }
 
-    VALIDATED_OP(Op::TAG, 1, 1, check_valid_string(state, bc.get_arg(offset + 1)))
+    VALIDATED_OP(Op::TAG, 1, 1, bc.check_string(bc.get_arg(offset + 1)))
     SIMPLE_OP(Op::LINE, 0, 0)
 
     SIMPLE_OP(Op::PATT_STR, 2, 1)
@@ -749,10 +796,13 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
                 bc.get_string(bc.public_table[i].name_idx)
             ));
         } else {
+            if (auto err = update_depth(fn, STACK_DEPTH_CALL); std::holds_alternative<std::string>(err)) {
+                bc.meta.errors.emplace_back(std::get<std::string>(err));
+                continue;
+            }
             queue.push_back(SymbolicInterpState{
                 .offset = fn,
                 .fn = fn,
-                .stack_depth = STACK_DEPTH_CALL,
             });
         }
     }
@@ -768,26 +818,17 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
                 return;
             }
 
-            if (get_depth(offset) != NUM_UNK) {
-                if (get_depth(offset) != state.stack_depth) {
-                    bc.meta.errors.emplace_back(std::format(
-                        "Stack depth mismatch at offset 0x{:08x}",
-                        offset
-                    ));
-                }
-                break;
-            }
+            i32 depth = get_depth(offset);
 
-            set_depth(offset, state.stack_depth);
-            update_max_stack_depth(state.fn, state.stack_depth);
-
-            if (state.stack_depth > MAX_STACK_DEPTH) {
+            if (depth > MAX_STACK_DEPTH) {
                 bc.meta.errors.emplace_back(std::format(
                     "Maximum stack depth exceeded at offset 0x{:08x}",
                     offset
                 ));
                 break;
             }
+
+            update_max_stack_depth(state.fn, depth);
 
             auto size_result = get_instruction_size(offset);
             if (std::holds_alternative<std::string>(size_result)) {
@@ -798,9 +839,9 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
 
             Op op = bc.get_opcode(offset);
 
-            if (state.stack_depth == STACK_DEPTH_CALL) {
+            if (depth == STACK_DEPTH_CALL) {
                 if (op == Op::BEGIN || op == Op::CBEGIN) {
-                    state.stack_depth = 0;
+                    depth = 0;
                 } else {
                     bc.meta.errors.emplace_back("Function must start with BEGIN or CBEGIN instruction");
                     break;
@@ -815,7 +856,19 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
             auto op_info = std::get<OpInfo>(op_info_result);
 
             if (op_info.forks_execution.has_value()) {
-                queue.push_back(op_info.forks_execution.value());
+                auto [forked_state, forked_depth] = op_info.forks_execution.value();
+                if (
+                    auto res = update_depth(forked_state.offset, forked_depth);
+                    std::holds_alternative<std::string>(res)
+                ) {
+                    bc.meta.errors.emplace_back(std::get<std::string>(res));
+                    break;
+                } else {
+                    bool visited = std::get<bool>(res);
+                    if (!visited) {
+                        queue.push_back(forked_state);
+                    }
+                }
             }
             offset += size;
             state.offset = offset;
@@ -825,7 +878,18 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
             if (op_info.new_stack_depth == STACK_DEPTH_UNK) {
                 break;
             }
-            state.stack_depth = op_info.new_stack_depth;
+
+            if (
+                auto res = update_depth(offset, op_info.new_stack_depth);
+                std::holds_alternative<std::string>(res)
+            ) {
+                bc.meta.errors.emplace_back(std::get<std::string>(res));
+                break;
+            } else {
+                if (std::get<bool>(res)) {
+                    break;
+                }
+            }
         }
     }
 
@@ -990,17 +1054,11 @@ struct VmConfig {
 enum class ExecutionError {
     END,
     STACK_OVERFLOW,
-    STACK_UNDERFLOW,
     RETURN_STACK_OVERFLOW,
     INTEGER_EXPECTED,
     NAME_NOT_FOUND,
-    LOCAL_SLOT_OUT_OF_BOUNDS,
     ARITHMETIC_ERROR,
-    ARG_SLOT_OUT_OF_BOUNDS,
     POINTER_EXPECTED,
-    TOO_MANY_ARGUMENTS,
-    STACK_INCONSISTENT,
-    NOT_IN_CLOSURE,
     MALFORMED_INSTRUCTION,
 };
 
@@ -1163,7 +1221,7 @@ ExecutionError vm_continue(bool trace = false) {
         }
         kase Op::STRING: {
             FETCH_VALUE(i32, s);
-            auto ptr = Value { .ptr = bc.get_string(s) };
+            auto ptr = Value { .ptr = bc.get_string_unchecked(s) };
             auto x = Bstring(&ptr.number);
             PUSH_PTR(x);
         }
@@ -1315,7 +1373,7 @@ ExecutionError vm_continue(bool trace = false) {
         }
         kase Op::SEXP: {
             FETCH_VALUE(i32, tag_idx);
-            char *tag = bc.get_string(tag_idx);
+            char *tag = bc.get_string_unchecked(tag_idx);
             FETCH_VALUE(u32, num_args);
             assert(vm.sp - vm.bp >= num_args);
             aint tag_hash = LtagHash(tag);
@@ -1326,7 +1384,7 @@ ExecutionError vm_continue(bool trace = false) {
         }
         kase Op::TAG: {
             FETCH_VALUE(i32, tag_idx);
-            char *tag = bc.get_string(tag_idx);
+            char *tag = bc.get_string_unchecked(tag_idx);
             FETCH_VALUE(u32, num_args);
             aint tag_hash = LtagHash(tag);
             POP(x);
@@ -1571,28 +1629,16 @@ i32 app_execute(const char *bytecode_filename, bool trace = false, bool profile 
             return 0;
         kase ExecutionError::NAME_NOT_FOUND:
             std::printf("Name not found\n");
-        kase ExecutionError::STACK_UNDERFLOW:
-            std::printf("Stack underflow\n");
         kase ExecutionError::STACK_OVERFLOW:
             std::printf("Stack overflow\n");
         kase ExecutionError::INTEGER_EXPECTED:
             std::printf("Integer expected\n");
         kase ExecutionError::RETURN_STACK_OVERFLOW:
             std::printf("Return stack overflow\n");
-        kase ExecutionError::LOCAL_SLOT_OUT_OF_BOUNDS:
-            std::printf("Local slot out of bounds\n");
         kase ExecutionError::ARITHMETIC_ERROR:
             std::printf("Arithmetic error\n");
-        kase ExecutionError::ARG_SLOT_OUT_OF_BOUNDS:
-            std::printf("Argument slot out of bounds\n");
         kase ExecutionError::POINTER_EXPECTED:
             std::printf("Pointer expected\n");
-        kase ExecutionError::TOO_MANY_ARGUMENTS:
-            std::printf("Too many arguments for a function\n");
-        kase ExecutionError::STACK_INCONSISTENT:
-            std::printf("Inconsistent stack usage\n");
-        kase ExecutionError::NOT_IN_CLOSURE:
-            std::printf("Attempt to access closure variables outside closure\n");
         kase ExecutionError::MALFORMED_INSTRUCTION:
             std::printf("Malformed instruction\n");
     }
