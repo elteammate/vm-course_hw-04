@@ -364,7 +364,7 @@ constexpr i32 MAX_LOCALS = 0xFFFF;
 
 struct SymbolicInterpState {
     i32 offset;
-    i32 current_fn;
+    i32 fn;
     i32 stack_depth;
 };
 
@@ -406,7 +406,7 @@ std::optional<std::string> set_num_captures(i32 fn_offset, i32 num_captures) {
 
 std::string report_error(const SymbolicInterpState &state, std::string message) {
     return std::format("Error at offset 0x{:08x}: {}\n", state.offset, message)
-        + std::format("Current function offset: 0x{:08x}\n", state.current_fn)
+        + std::format("Current function offset: 0x{:08x}\n", state.fn)
         + std::format("Stack depth: {}\n", state.stack_depth);
 }
 
@@ -454,14 +454,14 @@ void update_max_stack_depth(i32 fn, i32 stack_depth) {
 }
 
 std::optional<std::string> check_local_access(const SymbolicInterpState &state, i32 local_idx) {
-    if (local_idx < 0 || local_idx >= get_num_locals(state.current_fn)) {
+    if (local_idx < 0 || local_idx >= get_num_locals(state.fn)) {
         return report_error(state, "Local index out of bounds");
     }
     return std::nullopt;
 }
 
 std::optional<std::string> check_arg_access(const SymbolicInterpState &state, i32 arg_idx) {
-    if (arg_idx < 0 || arg_idx >= get_num_args(state.current_fn)) {
+    if (arg_idx < 0 || arg_idx >= get_num_args(state.fn)) {
         return report_error(state, "Argument index out of bounds");
     }
     return std::nullopt;
@@ -475,7 +475,7 @@ std::optional<std::string> check_global_access(const SymbolicInterpState &state,
 }
 
 std::optional<std::string> check_capture_access(const SymbolicInterpState &state, i32 capture_idx) {
-    i32 num_captures = get_num_captures(state.current_fn);
+    i32 num_captures = get_num_captures(state.fn);
     if (num_captures == 0 || num_captures == NUM_UNK) {
         return report_error(state, "Trying to access captured value outside closure");
     }
@@ -548,7 +548,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             .new_stack_depth = STACK_DEPTH_UNK,
             .forks_execution = SymbolicInterpState{
                 .offset = target,
-                .current_fn = state.current_fn,
+                .fn = state.fn,
                 .stack_depth = state.stack_depth,
             },
         };
@@ -597,7 +597,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             .new_stack_depth = state.stack_depth - 1,
             .forks_execution = SymbolicInterpState{
                 .offset = target,
-                .current_fn = state.current_fn,
+                .fn = state.fn,
                 .stack_depth = state.stack_depth - 1,
             },
         };
@@ -622,7 +622,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (auto err = set_num_captures(fn, num_captures); err.has_value()) {
             return *err;
         }
-        update_max_stack_depth(state.current_fn, state.stack_depth + num_captures + 1);
+        update_max_stack_depth(state.fn, state.stack_depth + num_captures + 1);
         for (i32 i = 0, designator_offset = offset + 9; i < num_captures; i++, designator_offset += 5) {
             i32 addr = bc.get_arg(designator_offset + 1);
             if (u8 designator = bc.get_byte(designator_offset); designator == 0) {
@@ -649,7 +649,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             .new_stack_depth = state.stack_depth + 1,
             .forks_execution = SymbolicInterpState{
                 .offset = fn,
-                .current_fn = fn,
+                .fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
             },
         };
@@ -662,7 +662,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (state.stack_depth < num_args + 1) {
             return report_error(state, "Stack underflow");
         }
-        update_max_stack_depth(state.current_fn, state.stack_depth - num_args + 2);
+        update_max_stack_depth(state.fn, state.stack_depth - num_args + 2);
         return OpInfo{
             .new_stack_depth = state.stack_depth - num_args,
             .forks_execution = std::nullopt,
@@ -691,7 +691,7 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
             .new_stack_depth = state.stack_depth - num_args + 1,
             .forks_execution = SymbolicInterpState{
                 .offset = fn,
-                .current_fn = fn,
+                .fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
             },
         };
@@ -751,7 +751,7 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
         } else {
             queue.push_back(SymbolicInterpState{
                 .offset = fn,
-                .current_fn = fn,
+                .fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
             });
         }
@@ -779,7 +779,7 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
             }
 
             set_depth(offset, state.stack_depth);
-            update_max_stack_depth(state.current_fn, state.stack_depth);
+            update_max_stack_depth(state.fn, state.stack_depth);
 
             if (state.stack_depth > MAX_STACK_DEPTH) {
                 bc.meta.errors.emplace_back(std::format(
