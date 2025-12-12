@@ -34,15 +34,6 @@ using f64 = double;
 #define otherwise break; default
 #define CONCAT(a, b) a ## b
 
-
-template <typename T>
-std::unique_ptr<T []> pin_array(std::vector<T> vec) {
-    std::unique_ptr<T[]> ptr(new T[vec.size()]);
-    std::move(vec.begin(), vec.end(), ptr.get());
-    return std::move(ptr);
-}
-
-
 #define OP_ENUM_DEFINITION \
     X(BINOP_ADD, 0x01) \
     X(BINOP_SUB, 0x02) \
@@ -161,7 +152,7 @@ struct Bytecode {
     }
 
     [[nodiscard]] Op get_opcode(i32 offset) const {
-        if (offset < 0 || offset + 1 > code_size) [[unlikely]] {
+        if (offset < 0 || offset >= code_size) [[unlikely]] {
             throw std::runtime_error(std::format("Code offset 0x{:08x} is out of bounds", offset));
         }
         if (!is_op(code[offset])) [[unlikely]] {
@@ -375,9 +366,6 @@ struct SymbolicInterpState {
     i32 offset;
     i32 current_fn;
     i32 stack_depth;
-    i32 num_args;
-    i32 num_locals;
-    i32 num_captures;
 };
 
 struct OpInfo {
@@ -393,44 +381,87 @@ void set_depth(i32 offset, i32 stack_depth) {
     bc.meta.data[offset] = stack_depth;
 }
 
-i32 get_max_stack_depth(i32 fn_offset) {
+i32 get_num_captures(i32 fn_offset) {
     return bc.meta.data[fn_offset + 1];
 }
 
-void update_max_stack_depth(i32 fn_offset, i32 stack_depth) {
-    i32 &slot = bc.meta.data[fn_offset + 1];
-    if (stack_depth > slot) {
-        slot = stack_depth;
+std::optional<std::string> set_num_captures(i32 fn_offset, i32 num_captures) {
+    if (num_captures < 0 || num_captures > MAX_NUM_CAPTURES) {
+        return std::format(
+            "Number of captures must be between 0 and {}",
+            MAX_NUM_CAPTURES
+        );
     }
-}
-
-i32 get_num_captures(i32 fn_offset) {
-    return bc.meta.data[fn_offset + 2];
-}
-
-void set_num_captures(i32 fn_offset, i32 num_captures) {
-    bc.meta.data[fn_offset + 2] = num_captures;
+    auto &slot = bc.meta.data[fn_offset + 1];
+    if (slot != NUM_UNK && slot != num_captures) {
+        return std::format(
+            "Number of captures mismatch at offset 0x{:08x}",
+            fn_offset
+        );
+    }
+    slot = num_captures;
+    return std::nullopt;
 }
 
 
 std::string report_error(const SymbolicInterpState &state, std::string message) {
     return std::format("Error at offset 0x{:08x}: {}\n", state.offset, message)
         + std::format("Current function offset: 0x{:08x}\n", state.current_fn)
-        + std::format("Stack depth: {}\n", state.stack_depth)
-        + std::format("Num args: {}\n", state.num_args)
-        + std::format("Num locals: {}\n", state.num_locals)
-        + std::format("Num captures: {}\n", state.num_captures);
+        + std::format("Stack depth: {}\n", state.stack_depth);
+}
+
+u32 pack_begin_params(i32 num_args, i32 stack_depth) {
+    return (u32)num_args | (u32)stack_depth << 16;
+}
+
+struct BeginParams {
+    i32 num_args;
+    i32 stack_depth;
+};
+
+BeginParams unpack_begin_params(u32 packed) {
+    i32 num_args = (i32)(packed & 0xFFFF);
+    i32 stack_depth = (i32)(packed >> 16);
+    return {num_args, stack_depth};
+}
+
+i32 get_num_locals(i32 fn) {
+    i32 packed;
+    std::memcpy(&packed, &bc.code[fn + 5], sizeof(packed));
+    return packed;
+}
+
+i32 get_num_args(i32 fn) {
+    u32 packed;
+    std::memcpy(&packed, &bc.code[fn + 1], sizeof(packed));
+    return unpack_begin_params(packed).num_args;
+}
+
+i32 get_max_stack_depth(i32 fn) {
+    u32 packed;
+    std::memcpy(&packed, &bc.code[fn + 1], sizeof(packed));
+    return unpack_begin_params(packed).stack_depth;
+}
+
+void update_max_stack_depth(i32 fn, i32 stack_depth) {
+    u32 packed;
+    std::memcpy(&packed, &bc.code[fn + 1], sizeof(packed));
+    auto unpacked = unpack_begin_params(packed);
+    if (unpacked.stack_depth < stack_depth) {
+        packed = pack_begin_params(unpacked.num_args, stack_depth);
+        std::memcpy(&bc.code[fn + 1], &packed, sizeof(packed));
+    }
 }
 
 std::optional<std::string> check_local_access(const SymbolicInterpState &state, i32 local_idx) {
-    if (local_idx < 0 || local_idx >= state.num_locals) {
+    if (local_idx < 0 || local_idx >= get_num_locals(state.current_fn)) {
         return report_error(state, "Local index out of bounds");
     }
     return std::nullopt;
 }
 
 std::optional<std::string> check_arg_access(const SymbolicInterpState &state, i32 arg_idx) {
-    if (arg_idx < 0 || arg_idx >= state.num_args) {
+    if (arg_idx < 0 || arg_idx >= get_num_args(state.current_fn)) {
         return report_error(state, "Argument index out of bounds");
     }
     return std::nullopt;
@@ -444,10 +475,11 @@ std::optional<std::string> check_global_access(const SymbolicInterpState &state,
 }
 
 std::optional<std::string> check_capture_access(const SymbolicInterpState &state, i32 capture_idx) {
-    if (state.num_captures == 0) {
+    i32 num_captures = get_num_captures(state.current_fn);
+    if (num_captures == 0 || num_captures == NUM_UNK) {
         return report_error(state, "Trying to access captured value outside closure");
     }
-    if (capture_idx < 0 || capture_idx >= state.num_captures) {
+    if (capture_idx < 0 || capture_idx >= num_captures) {
         return report_error(state, "Capture index out of bounds");
     }
     return std::nullopt;
@@ -518,9 +550,6 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
                 .offset = target,
                 .current_fn = state.current_fn,
                 .stack_depth = state.stack_depth,
-                .num_args = state.num_args,
-                .num_locals = state.num_locals,
-                .num_captures = state.num_captures,
             },
         };
     }
@@ -570,9 +599,6 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
                 .offset = target,
                 .current_fn = state.current_fn,
                 .stack_depth = state.stack_depth - 1,
-                .num_args = state.num_args,
-                .num_locals = state.num_locals,
-                .num_captures = state.num_captures,
             },
         };
     }
@@ -592,6 +618,9 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         i32 num_captures = bc.get_arg(offset + 5);
         if (num_captures < 0 || num_captures > MAX_NUM_CAPTURES) {
             return report_error(state, "Invalid number of captures");
+        }
+        if (auto err = set_num_captures(fn, num_captures); err.has_value()) {
+            return *err;
         }
         update_max_stack_depth(state.current_fn, state.stack_depth + num_captures + 1);
         for (i32 i = 0, designator_offset = offset + 9; i < num_captures; i++, designator_offset += 5) {
@@ -622,9 +651,6 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
                 .offset = fn,
                 .current_fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
-                .num_args = NUM_UNK,
-                .num_locals = NUM_UNK,
-                .num_captures = num_captures,
             },
         };
     }
@@ -654,6 +680,9 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
         if (num_args > MAX_LOCALS) {
             return report_error(state, "Too many arguments");
         }
+        if (num_args != get_num_args(fn)) {
+            return report_error(state, "Number of arguments mismatch");
+        }
         u8 first_opcode = bc.get_byte(fn);
         if (first_opcode != (u8)Op::BEGIN) {
             return report_error(state, "Function must start with BEGIN");
@@ -664,9 +693,6 @@ VALIDATED_OP(op, num_consume, num_produce, std::nullopt)
                 .offset = fn,
                 .current_fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
-                .num_args = num_args,
-                .num_locals = NUM_UNK,
-                .num_captures = 0,
             },
         };
     }
@@ -727,9 +753,6 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
                 .offset = fn,
                 .current_fn = fn,
                 .stack_depth = STACK_DEPTH_CALL,
-                .num_args = NUM_UNK,
-                .num_locals = NUM_UNK,
-                .num_captures = 0,
             });
         }
     }
@@ -751,14 +774,6 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
                         "Stack depth mismatch at offset 0x{:08x}",
                         offset
                     ));
-                }
-                if (state.stack_depth == STACK_DEPTH_CALL) {
-                    if (get_num_captures(offset) != state.num_captures) {
-                        bc.meta.errors.emplace_back(std::format(
-                            "Number of captures mismatch at offset 0x{:08x}",
-                            offset
-                        ));
-                    }
                 }
                 break;
             }
@@ -785,41 +800,7 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
 
             if (state.stack_depth == STACK_DEPTH_CALL) {
                 if (op == Op::BEGIN || op == Op::CBEGIN) {
-                    i32 num_args = bc.get_arg(offset + 1);
-                    i32 num_locals = bc.get_arg(offset + 5);
                     state.stack_depth = 0;
-
-                    if (state.num_args == NUM_UNK || state.num_args == num_args) {
-                        state.num_args = num_args;
-                    } else {
-                        bc.meta.errors.emplace_back(std::format(
-                            "Number of arguments mismatch at offset 0x{:08x}",
-                            offset
-                        ));
-                        break;
-                    }
-
-                    if (state.num_locals == NUM_UNK || state.num_locals == num_locals) {
-                        state.num_locals = num_locals;
-                    } else {
-                        bc.meta.errors.emplace_back(std::format(
-                            "Number of locals mismatch at offset 0x{:08x}",
-                            offset
-                        ));
-                        break;
-                    }
-
-                    if (state.num_args > MAX_LOCALS || state.num_locals > MAX_LOCALS) {
-                        bc.meta.errors.emplace_back(std::format(
-                            "Maximum number of locals exceeded at offset 0x{:08x}",
-                            offset
-                        ));
-                        break;
-                    }
-
-                    u32 packed = (u32)state.num_args | (u32)state.stack_depth << 16;
-                    std::memcpy(bc.code + offset + 1, &packed, sizeof(packed));
-                    set_num_captures(offset, state.num_captures);
                 } else {
                     bc.meta.errors.emplace_back("Function must start with BEGIN or CBEGIN instruction");
                     break;
@@ -837,6 +818,7 @@ void analyze_bytecode_stage1(const std::optional<std::string> &entrypoint) {
                 queue.push_back(op_info.forks_execution.value());
             }
             offset += size;
+            state.offset = offset;
             if (offset >= bc.code_size) {
                 break;
             }
